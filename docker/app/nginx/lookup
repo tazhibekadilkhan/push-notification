@@ -1,0 +1,737 @@
+#USE SPACES!!!
+#NodeJS upsteam
+upstream app_nodejs {
+    server 192.168.1.111:3000;
+}
+
+upstream php_server {
+    server unix:/var/run/php5-fpm.sock;
+    #server 127.0.0.1:9000;
+}
+
+server {
+    listen 80;
+    listen [::]:80 default_server ipv6only=on;
+
+    root /var/www/html;
+    index index.php;
+
+    # Make site accessible from http://localhost/
+    server_name www.nelsette.com;
+
+    client_max_body_size 80m;
+
+    location = / {
+        # First attempt to serve request as file, then
+        # as directory, then fall back to displaying a 404.
+        try_files $uri $uri/ /index.php;
+        # Uncomment to enable naxsi on this location
+        # include /etc/nginx/naxsi.rules
+    }
+
+    location ~* \.(git|ini|json)$ {
+        deny all;
+    }
+
+    #proxy_set_header        X-Real-IP       $remote_addr;
+    #proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+
+    #set_real_ip_from   192.168.1.0/24;
+    #set_real_ip_from   127.0.0.1;
+    #set_real_ip_from   192.168.2.1;
+    #real_ip_header     X-Forwarded-For;
+    #real_ip_recursive on;
+
+    ##
+    # Proxy for NodeJS
+    ##
+    location ^~ /socket.io/ {
+        #proxy_set_header X-Real-IP $remote_addr;
+        #proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #proxy_set_header Host $http_host;
+        #proxy_set_header X-NginX-Proxy true;
+        #proxy_pass http://app_nodejs;
+        #proxy_redirect off;
+        proxy_pass http://app_nodejs;
+        #proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+
+    }
+
+    #NODEJS TEST 
+    location = /nodejs {
+    proxy_pass http://app_nodejs;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+
+    }
+
+    #images caching
+    location ~*  \.(jpg|jpeg|png|gif|ico)$ {
+        expires 365d;
+    }
+
+    location ~* ^/(css/[0-9]+|css)/([a-zA-Z\-_/\.]+\.css)$ {
+        try_files $uri /css/$2;
+        add_header Content-Type text/css;
+        expires 365d;
+    }
+
+    location ~* ^/(js/[0-9]+|js)/([a-zA-Z\-_/\.]+\.js)$ {
+        try_files $uri /js/$2;
+        add_header Content-Type application/x-javascript;
+        expires 365d;
+    }
+
+    #ROUTER
+    location / {
+        #COMMON PAGES
+        rewrite ^/(.[0-9a-zA-Z_-]+)$ /do_route.php?username=$1&page=profile&$args? last;
+        rewrite ^/(.[0-9a-zA-Z_-]+)/(stats)$ /do_route.php?username=$1&page=$2&$args? last;
+        rewrite ^/(.[0-9a-zA-Z_-]+)/gallery((?!\.css).)?(.*)$ /do_route_photos.php?path=$1&$args? last; # PHOTOS PATH
+        rewrite ^/(.[0-9a-zA-Z_-]+)/albums((?!\.css).)?(.*)$ /do_route_albums.php?path=$1&$args? last; # ALBUMS PATH
+        rewrite ^/(.[0-9a-zA-Z_-]+)/album_([0-9_]+)$ /do_route_album.php?path=$1&albumid=$2&$args? last; # SPECIFIC ALBUM PATH
+        rewrite ^/(.[0-9a-zA-Z_-]+)/qm_photos$ /profile_match_gallery.php?username=$1&$args? last; # SPECIFIC ALBUM PATH
+
+        #PROFILE
+        rewrite ^/verification/(.[0-9a-zA-Z_-]+)$ /verification.php?code=$1? last; # verify new email
+        rewrite ^/confirmation/(.[0-9a-zA-Z_-]+)$ /confirmation.php?code=$1? last; # confirm registration
+        rewrite ^/reset/(.[0-9a-zA-Z_-]+)$ /reset_pass.php?code=$1? last; # verify new email
+        rewrite ^/(.[0-9a-zA-Z_-]+)/friends$ /friendlist.php?username=$1&$args? last; # LIST OF FRIEND PATH
+        rewrite ^/(.[0-9a-zA-Z_-]+)/friends/common$ /friendlist.php?username=$1&f=common&$args? last; # LIST OF COMMON FRIEND
+
+        #PROFILE FRIENDSHIP ACTIONS
+        rewrite ^/friend_(suggest|confirm|deny|cancel|remove)/([0-9]+)$ /friend_actions/friend_$1.php?id=$2 last;
+
+        #PROFILE STATS OLD
+        # rewrite ^/(.[0-9a-zA-Z_-]+)/progress$ /profile_progress.php?username=$1? last; # PLAYER'S PROGRESS PATH
+        # rewrite ^/(.[0-9a-zA-Z_-]+)/feedbacks$ /profile_feedbacks.php?username=$1? last; # PLAYER'S FEEDBACKS PATH
+
+
+        # PROFILE STATS STABLE
+        rewrite ^/(.[0-9a-zA-Z_-]+)/opinions$ /profile_opinions.php?username=$1&$args? last; # PLAYER'S OVERVIEW (TECH SPECS AND FEEDBACKS INCLUDED)  PATH
+        rewrite ^/(.[0-9a-zA-Z_-]+)/achievements$ /profile_achiev.php?username=$1&$args? last; # PLAYER'S AHIEVEMENTS PATH
+        rewrite ^/(.[0-9a-zA-Z_-]+)/matches$ /profile_matches.php?username=$1&match_type=qm&$args? last; # PLAYER'S MATCHES PATH
+        rewrite ^/(.[0-9a-zA-Z_-]+)/matches/(upcoming|live|waiting|completed)$ /profile_matches.php?username=$1&match_state=$2&$args? last; # PLAYER'S MATCHES PATH
+        rewrite ^/(.[0-9a-zA-Z_-]+)/matches/completed/(qm|cm)$ /profile_matches.php?username=$1&match_state=completed&match_type=$2&$args? last; # PLAYER'S COMPLETED MATCHES PATH
+        rewrite ^/(.[0-9a-zA-Z_-]+)/stats/(matches|common|qm|cm)$ /profile_stats_$2.php?username=$1&$args? last; # PLAYER'S STATS EXTRA PATHS
+        #Actions
+        rewrite ^/(.[0-9a-zA-Z_-]+)/stats/matches/load_next$ /actions/stats/matches/matches_by_stats_load_next.php?username=$1&$args? last; # PLAYER'S STATS MATCHES LOAD NEXT PATH
+        rewrite ^/(.[0-9a-zA-Z_-]+)/stats/cm/get_opponents$ /actions/stats/player/cm/opponents_stats_by_played_for.php?username=$1&$args? last; # PLAYER'S OPPONENTS BY CLUBS PLAYED FOR PATHS
+        rewrite ^/(.[0-9a-zA-Z_-]+)/stats/cm/get_career$ /actions/stats/player/cm/player_career_cm_stats.php?username=$1&$args? last; # PLAYER'S CAREER STATS
+
+
+        #PROFILE MATCHES CALENDAR
+        rewrite ^/(.[0-9a-zA-Z_-]+)/matches/(get_month_calendar|get_year_calendar)$ /actions/players/matches/player_matches_$2.php?username=$1? last; 
+
+
+        #CLUB PAGES
+        rewrite ^/(.[0-9a-zA-Z_-]+)/(chat|squad|calendar|opponents)$ /club_$2.php?username=$1&$args? last; # CLUB'S SQUAD, CHAT, CALENDAR, OPPONENTS
+        rewrite ^/(.[0-9a-zA-Z_-]+)/calendar/(in_request|out_request|upcoming|live|waiting|completed)$ /club_calendar.php?username=$1&match_state=$2&$args? last; # CLUB'S CALENDAR PATH
+        
+        
+        #ACTIONS
+        rewrite ^/(.[0-9a-zA-Z_-]+)/stats/club_matches/load_next$ /actions/stats/matches/club_matches_by_stats_load_next.php?username=$1&$args? last; # CLUB'S STATS MATCHES LOAD NEXT PATH
+        rewrite ^/(.[0-9a-zA-Z_-]+)/calendar/(get_month_calendar|get_year_calendar)$ /actions/clubs/matches/club_matches_$2.php?username=$1? last; 
+        rewrite ^/(.[0-9a-zA-Z_-]+)/chat/(add_message|load_next)$ /actions/clubs/chat/club_chat_$2.php?username=$1? last; 
+
+        #CLUB MANAGEMENT
+        rewrite ^/(.[0-9a-zA-Z_-]+)/management$ /club_management_main.php?username=$1&$args? last; # CLUB'S MAIN SETTINGS
+        rewrite ^/(.[0-9a-zA-Z_-]+)/management/(contacts|about|contracts)$ /club_management_$2.php?username=$1&$args? last; # CLUB'S SETTINGS
+    }
+
+
+    # VOTING FOR PLAYERS YOU PLAYED WITH PATH
+    location /players_voting {
+        try_files $uri /profile_voting.php?$args;
+    }
+
+    location /settings {
+        #VIEW
+        rewrite ^/settings$ /profile_settings_main.php?$args;
+        rewrite ^/settings/(account|player|links|notifications|balance)$ /profile_settings_$1.php? last;
+        rewrite ^/settings/balance/history$ /profile_settings_balance_history.php?$args? last;
+
+        #ACTIONS
+        rewrite ^/settings/set_(card|links|main|notif)$ /profile_actions/pr_set_$1.php? last; # settings handler
+        rewrite ^/settings/set_acc_(mail|pass|tz|username)$ /profile_actions/pr_set_acc_$1.php? last; # settings handler
+    }
+
+    #PROFILE ACTIONS
+    location /profile {
+        rewrite ^/profile/(avatar_upload|avatar_crop|avatar_delete|cover_upload|cover_crop|cover_delete)$ /update_profile/$1.php? last;
+    }
+
+    #SUPPORT ACTIONS
+    location /support {
+        rewrite ^/support/contact_us_mail_send$ /actions/support/contact_us_mail_send.php?$args? last;
+    }
+
+    # quick match global pathes
+    location /qm {
+        #VIEW
+             
+        #qm one
+        rewrite ^/qm/([0-9]+)$ /qm_one.php?id=$1&$args? last; # show specific quick match
+        rewrite ^/qm/([0-9]+)/invite$ /qm_invite.php?id=$1&$args last; # quick plus invite UI
+        rewrite ^/qm/([0-9]+)/photos$ /qm_photos.php?id=$1&$args last; # qm photos list UI
+        rewrite ^/qm/([0-9]+)/participants_fault$ /qm_participants_fault.php?id=$1&$args last; # match choose guilty players if match not took place UI
+        rewrite ^/qm/([0-9]+)/vote$ /qm_vote.php?id=$1&$args last; # quick vote UI
+        rewrite ^/qm/([0-9]+)/assessment/forward$ /player_assessment_forward.php?id=$1&type=qm&$args last; # ASSESSMENT ROUTING PAGE
+        rewrite ^/qm/([0-9]+)/assessment/(.[0-9a-zA-Z_-]+)$ /player_assessment.php?id=$1&username=$2&type=qm&$args last; # ASSESSMENT PAGE
+
+        #creation
+        rewrite ^/qm/new$ /match_creation_pf_choosing.php?type=qm$args;
+        rewrite ^/qm/new/pf/([0-9]+)$ /match_creation_main.php?pf=$1&type=qm&$args? last;
+
+        #ACTIONS
+        #creation
+        rewrite ^/qm/create$ /qm_actions/qm_create.php;
+        #qm one        
+        rewrite ^/qm/([0-9]+)/(change_descr|inv|participate|leave|cancel_req|deny_part|confirm_part|settings)$ /qm_actions/qm_$2.php?id=$1 last; # quick match handlers
+        rewrite ^/qm/([0-9]+)/sub_(set|back|del_offside|inv_fr|leave|offside|change|deny)$ /qm_actions/qm_sub_$2.php?id=$1 last; # quick match sub setting handlers
+        rewrite ^/qm/([0-9]+)/vote_(compl|fb|pr|part|canc)$ /qm_actions/qm_vote_$2.php?id=$1 last; # quick match vote handlers
+        rewrite ^/qm/(filter|set_area)$ /qm_actions/qm_$1.php;
+        rewrite ^/qm/([0-9]+)/cmt_(main|reply|rm|main_getsev|reply_getsev|find_reply)$ /qm_actions/qm_cmt_$2.php?id=$1 last; # qm comment handlers
+        rewrite ^/qm/([0-9]+)/offside_(add|remove)$ /qm_actions/qm_offside_$2.php?id=$1 last; # qm offside players handlers
+        rewrite ^/qm/([0-9]+)/match_(cancel|delete)$ /qm_actions/qm_match_$2.php?id=$1 last; # qm remove and cancel handlers
+        rewrite ^/qm/([0-9]+)/photos_(add|remove)$ /qm_actions/qm_photos_$2.php?id=$1 last; # qm photos handlers
+        rewrite ^/qm/([0-9]+)/assessment/(.[0-9a-zA-Z_-]+)/assess$ /actions/assessments/player/qm_assess.php?id=$1&username=$2&$args last; # ASSESS PLAYER
+        rewrite ^/qm/new/check_time$ /actions/matches/qm/qm_check_time.php?$args last;
+    }
+
+    # TECH FEATURES PROCESSING
+        location /progress/ {
+        rewrite ^/progress/([0-9]+)/([0-9]+)$ /progress_processing.php?ann_id=$1&user_id=$2 last; 
+    }
+
+    # FEEDBACKS PROCESSING
+        location /feedbacks/ {
+        rewrite ^/feedbacks/([0-9]+)/([0-9]+)$ /feedbacks_processing.php?ann_id=$1&user_id=$2 last;
+    }   
+
+    #NOTIFICATIONS
+    location = /notifications {
+        rewrite ^/notifications?(.*)$ /notifications.php?$args? last;
+    }
+  
+    #GALLERY
+    location = /gallery {
+        rewrite ^/gallery?(.*)$ /profile_photos.php?$args? last;
+    }
+
+    #FRIENDS
+    location = /friends {
+        #rewrite ^/friends?(.*)$ /friends.php?$args? last;
+        try_files $uri /friends.php?$args;
+        #try_files $uri /friends.php;
+    }
+
+    # /pf depended pathes
+    location /pf {
+        #VIEW
+        rewrite ^/pf$ /pf_all.php?$args? last;
+        rewrite ^/pf/all$ /pf_all.php?$args? last;
+
+        #ACTIONS
+        rewrite ^/pf/([0-9]+)$ /pf_one.php?id=$1&$args? last; #PLAYFIELD INFO
+        rewrite ^/pf/([0-9]+)/(edit|remove)$ /pf_actions/pf_$2.php?id=$1 last; #pf handler
+        rewrite ^/pf/(edit|get_nearby|check_name|first_add|set_area)$ /pf_actions/pf_$1.php last; #handler
+        rewrite ^/pf/(my|new)$ /pf_$1.php?$args last; # ui
+        rewrite ^/pf/([0-9]+)/(settings)$ /pf_$2.php?id=$1&$args last; # pf settings ui
+        rewrite ^/pf/all/filter$ /actions/playfields/pf_all_filter.php?$args? last;
+        rewrite ^/pf/filter$ /actions/playfields/pf_all_filter.php?$args? last;
+        rewrite ^/pf/load_next$ /actions/playfields/pf_load_next.php?$args? last;
+        rewrite ^/pf/all/load_next$ /actions/playfields/pf_load_next.php?$args? last;
+        rewrite ^/pf/([0-9]+)/assess$ /actions/assessments/playfield/pf_assess.php?id=$1 last; #pf assess handler
+    }
+
+
+    # /fc depended pathes
+    location /fc/ {
+        rewrite ^/fc/([0-9]+)$ /fc_one.php?id=$1&$args last; # facility info
+        rewrite ^/fc/([0-9]+)/(pf_add|edit|get_pf|cover_upload|cover_crop|cover_delete|avatar_upload|avatar_crop|avatar_delete)$ /pf_actions/fc_$2.php?id=$1 last; #handler
+        rewrite ^/fc/([0-9]+)/(settings|add_pf|pf_list)$ /fc_$2.php?id=$1&$args last; # fc settings ui 
+    }
+
+    #PLAYERS
+    location /players {
+        #VIEW
+        rewrite ^/players$ /players_top.php?$args;
+        rewrite ^/players/top$ /players_top.php?$args;
+        rewrite ^/players/all$ /players_all.php?$args;
+
+        #ACTIONS
+        rewrite ^/players/all/filter$ /actions/players/players_all_filter.php?$args;
+        rewrite ^/players/all/load_next$ /actions/players/players_load_next.php;
+    }
+
+    #MY COMMENTS
+    location = /comments {
+        rewrite ^/comments?(.*)$ /profile_comments.php?$args? last;
+    }
+  
+    #SIGN UP
+    location = /signup {
+        try_files $uri /signup.php;
+    }
+
+    #JOIN
+    location = /join {
+        try_files $uri /join.php?$args;
+    }
+
+    #JOIN MAIL
+    location = /join/mail {
+        try_files $uri /join_mail.php?$args;
+    }
+
+    #JOIN RESEND
+    location = /join/resend {
+        try_files $uri /join_actions/join_resend.php;
+    }
+
+    #JOIN change mail
+    location = /join/change_mail {
+        try_files $uri /join_actions/join_change_mail.php;
+    }
+
+    #LOGIN
+    location = /login {
+        try_files $uri /login.php?$args;
+    }
+
+    #RESET PASSWORD
+    location = /password_reset {
+        try_files $uri /password_reset.php?$args;
+    }
+
+    # SEND LETTER TO RESET PASSWORD HANDLER
+    location = /send_reset {
+        try_files $uri /profile_actions/pr_pass_reset.php;
+    }
+
+    # SET NEW PASSWORD HANDLER
+    location = /change_pass {
+        try_files $uri /profile_actions/pr_pass_change.php;
+    }
+
+
+    #ONBOARDING
+    location = /onboarding {
+        try_files $uri /onboard.php?$args;
+    }
+
+    #ONBOARD DATA PASSING
+    location = /onboarding/update {
+        try_files $uri /update_profile/update_item.php;
+    }
+
+    #VERIFY USERNAME AND EMAIL
+    location = /verify {
+        try_files $uri /verifydata.php;
+    }
+
+    #SIGN IN
+    location = /signin {
+        try_files $uri /signin.php;
+    }
+  
+    #CONTACT US
+    location = /contact {
+        try_files $uri /contact.php?$args;
+    }
+
+    #FAQ
+    location = /faq {
+        try_files $uri /faq.php?$args;
+    }
+
+    #SIGN OUT
+    location = /signout {
+        try_files $uri /signout.php;
+    }
+
+    #SEARCH
+    location /search {
+        rewrite ^/search$ /searching/search.php? last;
+        rewrite ^/search/(players|playfields|clubs|city_clubs)$ /searching/$1_search.php? last;
+    }
+
+    #LOCATION AUTOCOMPLETE
+    location = /getlocation {
+        rewrite ^/getlocation?(.*)$ /getlocation.php?$args? last;
+    }
+
+    location = /getcountry {
+        rewrite ^/getcountry?(.*)$ /getcountry.php?$args? last;
+    }
+
+    ##
+    #DISCUSSIONS
+    ##
+
+
+    location /discussions {
+        # VIEW
+        rewrite ^/discussions$ /discussions/page/1 redirect;
+        rewrite ^/discussions/mine$ /discussions/mine/page/1 redirect;
+        rewrite ^/discussions/page/([0-9]+)$ /discussions_feed.php?$args&page=$1? last;
+        rewrite ^/discussions/mine/page/([0-9]+)$ /discussions_mine.php?$args&page=$1? last;
+        rewrite ^/discussions/([0-9]+)$ /discussion.php?discussion_id=$1&$args? last;
+        rewrite ^/discussions/([0-9]+)/comment/([0-9]+)$ /discussion.php?discussion_id=$1&main_comment=$2&$args? last;
+        rewrite ^/discussions/([0-9]+)/reply/([0-9]+)$ /discussion.php?discussion_id=$1&reply_comment=$2&$args? last;
+        rewrite ^/discussions/creation$ /discussion_creation.php?$args? last;
+
+        # Actions
+        rewrite ^/discussions/create$ /discussion_actions/discussion_create.php? last;
+        rewrite ^/discussions/([0-9]+)/delete$ /discussion_actions/discussion_delete.php?discussion_id=$1? last;
+        rewrite ^/discussions/([0-9]+)/cmt_(main|reply|rm|main_getsev|reply_getsev|find_reply)$ /discussion_actions/discussion_cmt_$2.php?discussion_id=$1? last;
+        rewrite ^/discussions/([0-9]+)/(comment|reply)/([0-9]+)/delete$ /discussion_actions/discussion_$2_delete.php?discussion_id=$1&id=$3? last;
+        rewrite ^/discussions/(upload_entry_image)$ /discussion_actions/discussion_$1.php? last;
+    }
+
+    ##
+    # END OF DISCUSSIONS
+    ##
+
+    ##
+    # ERROR PAGES
+    ##
+
+    location ~* ^/error/([a-z]+)/([a-z_]+) {
+        try_files $uri /error_explain.php?$args&domain=$1&error=$2;
+    }
+
+    ##
+    # END OF ERROR PAGES
+    ##
+
+    ##
+    # CLUB PAGES
+    ##
+
+    location /clubs {
+        # all clubs
+        rewrite ^/clubs$ /clubs_top.php?$args? last;
+        rewrite ^/clubs/top$ /clubs_top.php?$args? last;
+        rewrite ^/clubs/all$ /clubs_all.php?$args? last;
+
+        # UIs
+        rewrite ^/clubs/creation$ /club_creation.php?$args? last;
+
+        # Actions
+        rewrite ^/clubs/create$ /actions/clubs/club_create.php? last;
+        rewrite ^/clubs/(upload_entry_image)$ /actions/clubs/club_$1.php? last;
+        rewrite ^/clubs/check_title$ /actions/clubs/club_check_title.php? last;
+        rewrite ^/clubs/check_username$ /actions/clubs/club_check_username.php? last;
+        rewrite ^/clubs/all/filter$ /actions/clubs/clubs_all_filter.php?$args? last;
+        rewrite ^/clubs/all/load_next$ /actions/clubs/clubs_load_next.php;
+
+        #CLUB MANAGE HANDLERS
+        rewrite ^/clubs/([0-9]+)/set_(contacts|username|titles|logo|main_shirts|third_shirt|bio)$ /actions/clubs/settings/club_set_$2.php?id=$1&$args? last; # CLUB SETTINGS
+        rewrite ^/clubs/([0-9]+)/shirts/([0-9]+)/(set_image|delete_image|set_description)$ /actions/clubs/settings/club_shirt_$3.php?id=$1&shirt_id=$2&$args? last; # SET CLUB SHIRT
+        rewrite ^/clubs/([0-9]+)/(delete|deactivate)$ /actions/clubs/settings/club_$2.php?id=$1&$args? last; # CLUB DELETION/DEACTIVATION
+    }
+
+   
+    ##
+    # END OF CLUB PAGES
+    ##
+
+    location /matches {
+    	#NEW MATCH ROUTING
+    	rewrite ^/matches/new$ /match_creation_type_router.php?$args;
+
+    	#all matches
+    	rewrite ^/matches$ /matches/upcoming redirect;
+        rewrite ^/matches/(upcoming|live|completed)$ /matches_all.php?&matches_state=$1&$args;
+
+        # ACTIONS
+        rewrite ^/matches/filter$ /actions/matches/matches_filter.php;
+        rewrite ^/matches/(upcoming|live|completed)/load_next$ /actions/matches/matches_all_$1_load_next.php;
+    }  
+
+    ##
+    # CLUB MATCHES
+    ##
+    location /cm {
+        # VIEW
+        rewrite ^/cm/new$ /match_creation_pf_choosing.php?type=cm&$args.php;
+        rewrite ^/cm/new/pf/([0-9]+)$ /match_creation_main.php?pf=$1&type=cm&$args? last;
+
+        rewrite ^/cm/([0-9]+)$ /cm.php?id=$1&type=cm&$args? last; # show specific club match     
+        rewrite ^/cm/([0-9]+)/vote$ /cm_vote.php?id=$1&type=cm&$args? last; # show specific club match voting page
+        rewrite ^/cm/([0-9]+)/assessment/forward$ /player_assessment_forward.php?id=$1&type=cm&$args last; # ASSESSMENT ROUTING PAGE
+        rewrite ^/cm/([0-9]+)/assessment/(.[0-9a-zA-Z_-]+)$ /player_assessment.php?id=$1&username=$2&type=cm&$args last; # ASSESSMENT PAGE
+
+        # ACTIONS
+        rewrite ^/cm/create$ /actions/matches/cm/cm_create.php;
+        rewrite ^/cm/(upcoming|live|completed)/load_next$ /actions/matches/cm/cm_all_$1_load_next.php;
+        rewrite ^/cm/([0-9]+)/vote/(suggest|confirm|resuggest)_(void|result)$ /actions/matches/cm/vote/cm_$2_$3.php?id=$1 last;
+        rewrite ^/cm/([0-9]+)/(change_descr|cancel|delete|club_cancel|club_participate|player_participate|player_leave|forgive_team|punish_team|am_comment_leave)$ /actions/matches/cm/cm_$2.php?id=$1 last;
+        rewrite ^/cm/([0-9]+)/assessment/(.[0-9a-zA-Z_-]+)/assess$ /actions/assessments/player/cm_assess.php?id=$1&username=$2&$args last; # ASSESS PLAYER
+        rewrite ^/cm/([0-9]+)/cmt_(main|reply|rm|main_getsev|reply_getsev|find_reply)$ /actions/matches/cm/cm_cmt_$2.php?id=$1 last; # cm comment handlers
+        rewrite ^/cm/new/check_time$ /actions/matches/cm/cm_check_time.php?$args last;
+    }
+
+    location /rcm/ {
+        # VIEW
+        rewrite ^/rcm/([0-9]+)$ /cm.php?id=$1&type=rcm&$args? last; # show specific request for club match
+
+        # RCM ACTIONS
+        rewrite ^/rcm/([0-9]+)/(change_descr|cancel|deny|choose_rival|confirm|create_match)$ /actions/matches/rcm/rcm_$2.php?id=$1 last; 
+    }
+
+
+    #MESSAGES
+    location /messages {
+        #VIEW
+        rewrite ^/messages$ /message_dialogs.php?$args;
+        rewrite ^/messages/([0-9]+)$ /messages.php?id=$1&$args? last; # OPENED DIALOG
+
+        #ACTIONS
+        rewrite ^/messages/send/([0-9]+)$ /actions/messages/send_message.php?id=$1&$args? last;
+        rewrite ^/messages/([0-9]+)/load_next$ /actions/messages/messages_chat_load_next.php?id=$1&$args? last;
+    }
+
+    ##
+    # CONTRACTS AND NEGOTIATIONS
+    ##
+
+    location /negotiations {
+        rewrite ^/negotiations$ /negotiations.php?$args;
+        rewrite ^/negotiations/([0-9]+)$ /negotiation.php?id=$1&$args? last; # CONTRACT PROPOSAL OPENED
+    }
+
+    location /contracts/ {
+
+    	#ACTIONS
+    	#CONTRACT
+    	rewrite ^/contracts/contract/([0-9]+)/terminate$ /actions/clubs/contracts/contract_terminate.php?contract=$1&$args? last; # CONTRACT TERMINATION 
+    	rewrite ^/contracts/contract/playing_number_update$ /actions/clubs/contracts/contract_playing_number_update.php?&$args? last; # CONTRACT PLAYING NUMBER UPDATE
+    	#PROPOSAL
+    	rewrite ^/contracts/proposal/new$ /actions/clubs/contracts/proposal_new.php?$args? last; # CONTRACT PROPOSAL 
+        rewrite ^/contracts/proposal/([0-9]+)/confirm$ /actions/clubs/contracts/proposal_confirm_new.php?proposal=$1&$args? last; # CONTRACT PROPOSAL CONFIRMATION
+        rewrite ^/contracts/proposal/([0-9]+)/(deny|cancel|add_message)$ /actions/clubs/contracts/proposal_$2.php?proposal=$1&$args? last; # CONTRACT PROPOSAL DENIAL, CANCELLATION, MESSAGE ADDING
+    }
+
+    ##
+    # END OF CONTRACTS AND NEGOTIATIONS
+    ##
+
+    #PHOTOS UPLOAD
+    location = /photos/add {
+        try_files $uri /photo_actions/photo_add.php;
+    } 
+
+    #DOWNLOAD FILES
+    location = /download {
+        try_files $uri /download.php?$args;
+    }
+
+    location = /profile_verification/intro {
+        try_files $uri /profile_verification_intro.php;
+    }
+
+    location = /profile_verification {
+        try_files $uri /profile_verification.php;
+    }
+
+    location = /profile_verification/send {
+        try_files $uri /profile_actions/pr_send_v_request.php;
+    }
+
+    location = /profile_verification/upload {
+        try_files $uri /photo_actions/verification_photo_upload.php;
+    }
+
+    location = /404 {
+        try_files $uri /404.html;
+    }
+
+    error_page 404 /404.php;
+
+    location ~* /(images|cache|media|logs|tmp)/.*.(php|pl|py|jsp|asp|sh|cgi)$ {
+        return 404;
+        error_page 404 /404.php;
+    }
+
+    # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
+    #
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        try_files $uri =404;
+        ## NOTE: You should have "cgi.fix_pathinfo = 0;" in php.ini
+        #
+        # With php5-cgi alone:
+        #fastcgi_pass 127.0.0.1:9000;
+        ## With php5-fpm:
+        #fastcgi_pass unix:/var/run/php5-fpm.sock;
+        fastcgi_pass php_server;
+        #fastcgi_pass unix:/var/run/php5-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_intercept_errors on;
+        fastcgi_param SCRIPT_FILENAME $document_root/$fastcgi_script_name;
+        include fastcgi_params;
+        #fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        #fastcgi_param REMOTE_ADDR $http_x_real_ip; 
+        #set_real_ip_from   192.168.1.0/24;
+        #set_real_ip_from   192.168.2.1;
+        #real_ip_header     X-Real-IP;
+        #real_ip_recursive on;
+        #proxy_set_header        X-Real-IP       $remote_addr;
+        #proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+        #add_header X-Client-IP $remote_addr;
+        include proxy_params;
+        #proxy_buffer_size   128k;
+        #proxy_buffers   4 256k;
+        #proxy_busy_buffers_size   256k;
+        fastcgi_buffers 16 16k; 
+        fastcgi_buffer_size 32k;
+    }
+}
+
+server {
+
+    #listen 80;
+    #listen [::]:80 default_server ipv6only=on;
+
+    #root /var/www/verification;
+
+    root /var/www/html/verification;
+
+    index index.php;
+
+    server_name verification.nelsette.com;
+
+    client_max_body_size 80m;
+
+    location ~* ^/(css/[0-9]+|css)(/lib|/verification)?/([a-zA-Z\-_\.]+\.css)$ {
+        alias /var/www/html;
+        try_files $uri /css$2/$3;
+        add_header Content-Type text/css;
+        expires 365d;
+    }
+
+    location ~* ^/img/([a-zA-Z\-_/\.]+)$ {
+        alias /var/www/html;
+        try_files $uri /img/$1;
+    }
+
+    location /js_locale_vars {
+        alias /var/www/html;
+        try_files $uri /js_locale_vars.php;
+        location ~ \.php$ {
+            try_files $uri =404;
+            fastcgi_pass  unix:/var/run/php5-fpm.sock;
+            include fastcgi_params;
+            fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
+        }
+    }
+
+    location ~* ^/(js/[0-9]+|js)(/dist|/verification)?/([a-zA-Z\-_\.]+\.js)$ {
+        alias /var/www/html;
+        try_files $uri /js$2/$3;
+        add_header Content-Type application/x-javascript;
+        expires 365d;
+    }
+
+    location ~* "^/(profile_avatars|profile_original_avatars)/(.{1,})$" {
+        alias /var/www/html;
+        try_files $uri /profile_avatars/$2;
+    }
+
+    location ~* "^/(tmp_av_verification_original)/(.{1,})$" {
+        alias /var/www/html;
+        try_files $uri /tmp_av_verification_original/$2;
+    }
+
+    location ~* "^/(tmp_verif_doc_photos)/(.{1,})$" {
+        alias /var/www/html;
+        try_files $uri /tmp_verif_doc_photos/$2;
+    }
+
+    location = / {
+        rewrite ^/?(.*)$ /login redirect;
+    }
+
+    location = /login {
+        try_files $uri /login.php?$args;
+    }
+
+    location = /signin {
+        try_files $uri /auth/signin.php;
+    }
+
+    location = /signout {
+        try_files $uri /auth/signout.php;
+    }
+
+    location /v/ {
+        # ZONES
+        rewrite ^/v/zones$ /v/zones.php?$args last;
+        rewrite ^/v/zones/([a-zA-Z0-9_]+)$ /v/zones/$1/requests/waiting redirect;
+        rewrite ^/v/zones/([a-zA-Z0-9_]+)/requests$ /v/zones/$1/requests/waiting redirect;
+        rewrite ^/v/zones/([a-zA-Z0-9_]+)/requests/(waiting|with_mistakes|verified)$ /v/requests_$2.php?zone=$1 last;
+        rewrite ^/v/zones/([a-zA-Z0-9_]+)/moderators$ /v/requests_moderators.php?zone=$1 last;
+        # REQUESTS ACTIONS
+        rewrite ^/v/requests/(start|next|end)$ /v/moderation/$1_requests_processing.php last;
+        rewrite ^/v/requests/([0-9]+)$ /v/request.php?request_id=$1 last;
+        rewrite ^/v/requests/([0-9]+)/processed$ /v/request_processed.php?request_id=$1 last;
+        rewrite ^/v/requests/([0-9]+)/(deny|confirm|interrupt)$ /v/requests_action/$2_request.php?request_id=$1 last;
+        rewrite ^/v/requests/(check_iid_num)$ /v/requests_action/$1.php last;
+    }
+
+    location /a/ {
+        # ZONES
+        rewrite ^/a/zones$ /a/zones.php?$args last;
+        rewrite ^/a/zones/([a-zA-Z0-9_]+)$ /a/zones/$1/requests/waiting redirect;
+        rewrite ^/a/zones/([a-zA-Z0-9_]+)/requests$ /a/zones/$1/requests/waiting redirect;
+        rewrite ^/a/zones/([a-zA-Z0-9_]+)/requests/(waiting|with_mistakes|verified)$ /a/requests_$2.php?zone=$1 last;
+        rewrite ^/a/zones/([a-zA-Z0-9_]+)/moderators$ /a/requests_moderators.php?zone=$1 last;
+        # REQUESTS ACTIONS
+        rewrite ^/a/requests/(start|next|end)$ /a/moderation/$1_requests_processing.php last;
+        rewrite ^/a/requests/([0-9]+)$ /a/request.php?request_id=$1 last;
+        rewrite ^/a/requests/([0-9]+)/processed$ /a/request_processed.php?request_id=$1 last;
+        rewrite ^/a/requests/([0-9]+)/(deny|confirm|interrupt)$ /a/requests_action/$2_request.php?request_id=$1 last;
+    }
+
+
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        try_files $uri =404;
+        #       # NOTE: You should have "cgi.fix_pathinfo = 0;" in php.ini
+        #
+        # With php5-cgi alone:
+        #       fastcgi_pass 127.0.0.1:9000;
+        #       # With php5-fpm:
+        #fastcgi_pass unix:/var/run/php5-fpm.sock;
+        fastcgi_pass php_server;
+        #fastcgi_pass unix:/var/run/php5-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_intercept_errors on;
+        fastcgi_param SCRIPT_FILENAME $document_root/$fastcgi_script_name;
+        include fastcgi_params;
+        #fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        #fastcgi_param REMOTE_ADDR $http_x_real_ip; 
+        #set_real_ip_from   192.168.1.0/24;
+        #set_real_ip_from   192.168.2.1;
+        #real_ip_header     X-Real-IP;
+        #real_ip_recursive on;
+        #proxy_set_header        X-Real-IP       $remote_addr;
+        #proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+        #add_header X-Client-IP $remote_addr;
+        include proxy_params;
+        #proxy_buffer_size   128k;
+        #proxy_buffers   4 256k;
+        #proxy_busy_buffers_size   256k;
+        fastcgi_buffers 16 16k;
+        fastcgi_buffer_size 32k;
+    }
+
+}

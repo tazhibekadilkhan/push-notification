@@ -1,0 +1,50 @@
+version: '3.1'
+
+networks:
+  test:
+volumes:
+  postgres:
+    driver: local
+
+services:
+  nginx:
+    image: nginx:1.13-alpine
+    container_name: test_nginx
+    tty: true
+    ports:
+      - "8087:80"
+    volumes:
+      - ../../:/var/www/html
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - php-fpm
+      - postgres
+    networks:
+      - test
+  postgres:
+    image: postgres:14.7-alpine
+    environment:
+      POSTGRES_USER: "adilkhan"
+      POSTGRES_PASSWORD: "123"
+      POSTGRES_DB: "test"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    container_name: test_postgres
+    restart: unless-stopped
+    ports:
+      - "54325:5432"
+    networks:
+      - test
+  php-fpm:
+    image: php:8.4.3-fpm
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    working_dir: /var/www/html
+    container_name: test_php
+    volumes:
+      - ../../:/var/www/html
+    ports:
+      - "9005:9000"
+    networks:
+      - test

@@ -34,15 +34,17 @@
             const response = await fetch('/api/v1/profile', {
                 method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
                     'Accept': 'application/json',
+                    // 'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 }
             });
+
+
 
             const data = await response.json();
             document.getElementById('user-name').textContent = data.data.name || 'Пользователь';
         } catch (err) {
-            console.error('Ошибка авторизации:', err.message);
             // localStorage.removeItem('token');
             // window.location.href = '/login';
         }

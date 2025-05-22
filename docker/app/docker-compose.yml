@@ -21,6 +21,19 @@ services:
       - postgres
     networks:
       - test
+  node:
+    image: node:20-alpine
+    container_name: test_node
+    working_dir: /var/www/html
+    volumes:
+        - ../../:/var/www/html
+    command: sh -c "npm install && npm run dev"
+    ports:
+        - "5173:5173"
+    networks:
+        - test
+    depends_on:
+        - php-fpm
   postgres:
     image: postgres:14.7-alpine
     environment:

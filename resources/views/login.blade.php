@@ -59,8 +59,8 @@
 
             const data = await response.json();
 
-            if (data.data.error) {
-                errorMessage.textContent = data.data.error || 'Ошибка авторизации';
+            if (data.error) {
+                errorMessage.textContent = data.error || 'Ошибка авторизации';
                 errorMessage.classList.remove('hidden');
                 return;
             }

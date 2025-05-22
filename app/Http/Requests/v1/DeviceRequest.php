@@ -19,7 +19,7 @@ class DeviceRequest extends FormRequest
     public function rules()
     {
         return [
-            'token' => ['required', 'string', 'unique:devices,token']
+            'token' => ['required', 'unique:devices,token']
         ];
     }
 }

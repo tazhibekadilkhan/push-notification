@@ -67,6 +67,7 @@ php artisan schedule:work
 ## 11.запустить команду npm
 
 ```
+npm install
 npm run dev
 
 ```

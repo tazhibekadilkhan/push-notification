@@ -61,7 +61,7 @@ class SendPushNotificationJob implements ShouldQueue
 
     protected function createMessagingInstance(): \Kreait\Firebase\Messaging
     {
-        $serviceAccountPath = storage_path('tredo-3cc05-firebase-adminsdk-fbsvc-e474411f14.json');
+        $serviceAccountPath = storage_path('firebase-credentials.json');
         return (new Factory())->withServiceAccount($serviceAccountPath)->createMessaging();
     }
 

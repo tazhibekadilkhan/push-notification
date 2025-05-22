@@ -51,7 +51,27 @@ php artisan migrate
 php artisan db:seed
 ```
 
-## 9.перейти к
+## 9.запустить команду queue
+
+```
+php artisan queue:work
+```
+
+## 10.запустить команду schedule
+
+```
+php artisan schedule:work
+
+```
+
+## 11.запустить команду npm
+
+```
+npm run dev
+
+```
+
+## 12.перейти к
 
 ```
 http://localhost:8087

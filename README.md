@@ -4,6 +4,10 @@
 
 ---
 
+## 🔐 Firebase Credentials
+
+Создай файл `storage/firebase-credentials.json` на основе `storage/firebase-credentials.example.json` и вставь туда свои сервисные ключи Firebase.
+
 ## 🚀 Установка
 
 ## 1. Если необходимо, отредактируйте пути в файле `/docker/app/docker-compose.yml`.

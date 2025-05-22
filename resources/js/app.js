@@ -1,5 +1,5 @@
 import './bootstrap';
-import { messaging, getToken, onMessage } from './firebase';
+import {messaging, getToken, onMessage} from './firebase';
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('logout-btn').addEventListener('click', () => {
@@ -29,15 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Отправка на сервер
                 await fetch('/api/v1/devices/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    },
-                    body: JSON.stringify({
-                        token: token
-                    })
+                    method: 'POST', headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json',
+                    }
                 });
 
                 alert('✅ Уведомления включены');
@@ -50,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Отображение входящих уведомлений в активной вкладке
     onMessage(messaging, (payload) => {
         console.log("Получено сообщение:", payload);
     });

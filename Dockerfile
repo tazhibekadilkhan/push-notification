@@ -27,8 +27,10 @@ RUN apt-get update && \
 # Установка Composer
 RUN curl --silent --show-error https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
 # Установка Xdebug и включение его
-RUN pecl install xdebug \
+RUN if ! php -m | grep -q 'xdebug'; then pecl install xdebug; fi \
     && docker-php-ext-enable xdebug
 
 # Установка Laravel Envoy

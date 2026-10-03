@@ -1,144 +1,153 @@
 # 📦 Laravel Push Notification Panel
 
-Это Laravel-проект с API и фронтендом на Blade + Tailwind CSS. Пользователь может регистрироваться, входить, подписываться на push-уведомления и работать с уведомлениями через админ-панель (Filament).
+This is a Laravel project with an API and a Blade + Tailwind CSS frontend. Users can register, log in, subscribe to push notifications, and manage notifications through the admin panel (Filament).
 
 ---
 
 ## 🔐 Firebase Credentials
 
-Создай файл `storage/firebase-credentials.json` на основе `storage/firebase-credentials.example.json` и вставь туда свои сервисные ключи Firebase.
+Create the `storage/firebase-credentials.json` file based on `storage/firebase-credentials.example.json` and add your Firebase service credentials.
 
-## 🚀 Установка
+## 🚀 Installation
 
-## 1. Если необходимо, отредактируйте пути в файле `/docker/app/docker-compose.yml`.
+## 1. If necessary, update the paths in the `/docker/app/docker-compose.yml` file.
 
-## 2. Перейдите в директорию docker/app и выполните следующие команды:
-   ``` 
-   docker-compose build 
-   docker-compose up -d
+## 2. Navigate to the `docker/app` directory and run the following commands:
+
+```bash
+docker-compose build
+docker-compose up -d
 ```
 
-## 3. Проверьте, запустились ли контейнеры:
- ``` 
- docker ps -a
- ```
+## 3. Check whether the containers are running:
 
-Должно выглядеть так:
-
+```bash
+docker ps -a
 ```
+
+The output should look like this:
+
+```text
 c641f3a91181   nginx:1.13-alpine      "nginx -g 'daemon of…"   10 hours ago   Up 10 hours   0.0.0.0:8080->80/tcp     test_nginx
 953d9acbc614   php:8.2.1-fpm          "docker-php-entrypoi…"   10 hours ago   Up 10 hours   0.0.0.0:9000->9000/tcp   test_php
 81fe68292b66   postgres:14.7-alpine   "docker-entrypoint.s…"   10 hours ago   Up 10 hours   0.0.0.0:5432->5432/tcp   test_postgres
 ```
 
-## 4. Затем перейти в bash контейнера php:
-   ```
-   docker exec -it test_php bash
-   ```
+## 4. Access the PHP container's bash shell:
 
-## 5. Поставить все зависимости:
-   ``` 
-   composer install
-   ```
+```bash
+docker exec -it test_php bash
+```
 
-## 6. скопировать .env.example to .env
+## 5. Install all dependencies:
 
+```bash
+composer install
+```
 
-## 7. Поставить миграции бд:
-``` 
+## 6. Copy `.env.example` to `.env`.
+
+## 7. Run the database migrations:
+
+```bash
 php artisan migrate
 ```
 
-## 8.запустить команду seed
+## 8. Run the database seeders:
 
-```
+```bash
 php artisan db:seed
 ```
 
-## 9.запустить команду queue
+## 9. Start the queue worker:
 
-```
+```bash
 php artisan queue:work
 ```
 
-## 10.запустить команду schedule
+## 10. Start the scheduler:
 
-```
+```bash
 php artisan schedule:work
-
 ```
 
-## 11.запустить команду npm
+## 11. Install and run the frontend:
 
-```
+```bash
 npm install
 npm run dev
-
 ```
 
-## 12.перейти к
+## 12. Open the following URL in your browser:
 
-```
+```text
 http://localhost:8087
 ```
 
+---
 
-## 📄 Описание страниц
+## 📄 Pages
 
 ### 🔐 `/login`
 
-Форма входа:
-- Пользователь вводит `email` и `password`. default (user@test.com 12345)
-- При успешном входе токен сохраняется в `localStorage`, и выполняется переход на `/`.
+Login form:
+
+* The user enters their `email` and `password`. Default credentials: `user@test.com` / `12345`
+* After successful login, the token is stored in `localStorage`, and the user is redirected to `/`.
 
 ### 📝 `/register`
 
-Форма регистрации:
-- Поля: имя, email, пароль и подтверждение пароля.
-- При успехе — редирект на `/login`.
+Registration form:
+
+* Fields: name, email, password, and password confirmation.
+* After successful registration, the user is redirected to `/login`.
 
 ### 🏠 `/`
 
-Главная страница:
-- Отображает имя пользователя (из API `/api/v1/profile`)
-- Кнопка «Выход»
-- Кнопка «Подписаться на уведомления»
+Home page:
 
-🔒 Только для авторизованных пользователей.  
-Если токен отсутствует — выполняется переадресация на `/login`.
+* Displays the user's name from the `/api/v1/profile` API endpoint.
+* **Logout** button.
+* **Subscribe to notifications** button.
 
-## 🛠️ Админ-панель (Filament)
+🔒 Available only to authenticated users.
+If the token is missing, the user is redirected to `/login`.
+
+## 🛠️ Admin Panel (Filament)
 
 ### 🔐 `/admin/login`
 
-Форма входа:
-- Пользователь вводит `email` и `password`. default (admin@test.com 12345)
+Login form:
 
-### 🔔 Уведомления (`/admin/notifications`)
+* The administrator enters their `email` and `password`. Default credentials: `admin@test.com` / `12345`
 
-- Список уведомлений с колонками:
-    - Заголовок
-    - Текст
-    - Дата и время отправки
-    - Статус (`Ожидает`, `Отправлено`)
+### 🔔 Notifications (`/admin/notifications`)
 
-- Возможности:
-    - Создание нового уведомления:
-        - Указывается заголовок, текст и `send_at` (дата/время отправки)
-        - В указанное время уведомление автоматически рассылается на все устройства
-    - Просмотр статуса отправки:
-        - У каждого уведомления есть кнопка для перехода к списку отправленных пушей
+* List of notifications with the following columns:
 
-### 📱 Отправленные уведомления (`/admin/push-notifications`)
+  * Title
+  * Text
+  * Scheduled date and time
+  * Status (`Pending`, `Sent`)
 
-- Список всех push-уведомлений
-- Можно фильтровать по `notification_id` (обычно переход осуществляется из уведомления)
-- Колонки:
-    - Устройство
-    - Статус (`Доставлено`, `Ожидает`, `Ошибка`)
-    - Ответ Firebase (если была ошибка)
+* Available actions:
 
-> ⚙️ Раздел недоступен напрямую из навбара — доступен только через уведомления.
+  * Create a new notification:
 
+    * Specify the title, text, and `send_at` date/time.
+    * At the specified time, the notification is automatically sent to all registered devices.
+  * View delivery status:
 
+    * Each notification has a button that opens the list of push notifications sent for that notification.
 
+### 📱 Sent Notifications (`/admin/push-notifications`)
+
+* List of all push notifications.
+* Can be filtered by `notification_id` (usually accessed from the notification details).
+* Columns:
+
+  * Device
+  * Status (`Delivered`, `Pending`, `Error`)
+  * Firebase response (if an error occurred)
+
+> ⚙️ This section is not available directly from the navbar and can only be accessed through the Notifications section.
